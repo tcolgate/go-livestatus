@@ -114,6 +114,12 @@ func (d stringDuration) String() string {
 	return fmt.Sprintf("%d", d.Duration/time.Second)
 }
 
+// KeepAliveOff disables the default keepalive from Command
+func (q *Query) KeepAliveOff() *Query {
+	q.ls.keepalive = false
+	return q
+}
+
 func (c *Command) Hostname(s string) {
 	c.setVal("host_name", s)
 }

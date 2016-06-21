@@ -13,6 +13,16 @@ type Livestatus struct {
 	keepConn  net.Conn
 }
 
+// Close any open connection from a KeepAlive
+func (l *Livestatus) Close() error {
+	l.keepalive = false
+	if l.keepConn != nil {
+		l.keepConn = nil
+		return l.keepConn.Close()
+	}
+	return nil
+}
+
 // Query creates a new query instance on a spacific table.
 func (l *Livestatus) Query(table string) *Query {
 	l.keepalive = false
