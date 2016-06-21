@@ -2,7 +2,6 @@ package livestatus
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"regexp"
 	"strings"
@@ -77,7 +76,7 @@ type Command struct {
 	ls   *Livestatus
 }
 
-func newCommand(ls *Livestatus, s string) *Command {
+func newCommand(s string, ls *Livestatus) *Command {
 	return &Command{
 		cmd:  s,
 		vals: map[string]string{},
@@ -86,7 +85,7 @@ func newCommand(ls *Livestatus, s string) *Command {
 }
 
 func (c *Command) setVal(k string, v interface{}) {
-	c.vals[k] = fmt.Sprintf("%s", v)
+	c.vals[k] = fmt.Sprintf("%v", v)
 }
 
 type stickyBool bool
@@ -107,12 +106,6 @@ func (b normalBool) String() string {
 	} else {
 		return "0"
 	}
-}
-
-type stringDate struct{ time.Time }
-
-func (d stringDate) String() string {
-	return fmt.Sprintf("%d", d.Unix())
 }
 
 type stringDuration struct{ time.Duration }
@@ -162,7 +155,7 @@ func (c *Command) End(t time.Time) {
 }
 
 func (c *Command) Duration(t time.Duration) {
-	c.setVal("duration", t/time.Second)
+	c.setVal("duration", stringDuration{t}.String())
 }
 
 func (c *Command) TriggerID(i int) {
@@ -191,16 +184,10 @@ func (c *Command) Exec() (*Response, error) {
 	}
 
 	conn.Write([]byte(cmd))
+	conn.Close()
+	// You get nothing back from an external command
+	// no way of knowing if this has worked
 
-	// Read response header
-	data := make([]byte, 16)
-
-	_, err = conn.Read(data)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Println(string(data))
 	return resp, nil
 }
 
@@ -228,12 +215,12 @@ func (c *Command) buildCmd(t time.Time) (string, error) {
 		}
 	}
 
-	cmdStr := fmt.Sprintf("COMMAND %d %s", t.Unix(), c.cmd)
+	cmdStr := fmt.Sprintf("COMMAND [%d] %s", t.Unix(), c.cmd)
 	for _, a := range def.args {
 		cmdStr = fmt.Sprintf("%s;%s", cmdStr, c.vals[a])
 	}
 
-	return fmt.Sprintf("%s\n\n", cmdStr), nil
+	return fmt.Sprintf("%s\n", cmdStr), nil
 }
 
 func (c *Command) dial() (net.Conn, error) {
