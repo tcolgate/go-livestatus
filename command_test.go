@@ -6,9 +6,9 @@ import (
 )
 
 func Test_Cmd_AcknowledgeHostProblem(t *testing.T) {
-	expected := "COMMAND 12345678 ACKNOWLEDGE_HOST_PROBLEM;host;2;1;1;me@example.com;some stuff\n\n"
+	expected := "COMMAND [12345678] ACKNOWLEDGE_HOST_PROBLEM;host;2;1;1;me@example.com;some stuff\n"
 
-	c := newCommand(&Livestatus{}, "ACKNOWLEDGE_HOST_PROBLEM")
+	c := newCommand("ACKNOWLEDGE_HOST_PROBLEM", &Livestatus{})
 	c.Hostname("host")
 	c.Sticky(true)
 	c.Notify(true)
