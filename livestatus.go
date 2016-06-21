@@ -8,15 +8,20 @@ type Livestatus struct {
 	network string
 	address string
 	dialer  func() (net.Conn, error)
+
+	keepalive bool
+	keepConn  net.Conn
 }
 
 // Query creates a new query instance on a spacific table.
 func (l *Livestatus) Query(table string) *Query {
+	l.keepalive = false
 	return newQuery(table, l)
 }
 
 // Command creates a new command instanc.
 func (l *Livestatus) Command(cmd string) *Command {
+	l.keepalive = true
 	return newCommand(cmd, l)
 }
 

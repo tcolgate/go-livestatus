@@ -170,12 +170,25 @@ func (c *Command) DowntimeID(i int) {
 func (c *Command) Exec() (*Response, error) {
 	resp := &Response{}
 
-	// Connect to socket
-	conn, err := c.dial()
-	if err != nil {
-		return nil, err
+	var err error
+	var conn net.Conn
+
+	if c.ls.keepConn != nil {
+		conn = c.ls.keepConn
+	} else {
+		// Connect to socket
+		conn, err = c.dial()
+		if err != nil {
+			return nil, err
+		}
 	}
-	defer conn.Close()
+
+	if !c.ls.keepalive {
+		c.ls.keepConn = nil
+		defer conn.Close()
+	} else {
+		c.ls.keepConn = conn
+	}
 
 	// Send command data
 	cmd, err := c.buildCmd(time.Now())
@@ -184,7 +197,6 @@ func (c *Command) Exec() (*Response, error) {
 	}
 
 	conn.Write([]byte(cmd))
-	conn.Close()
 	// You get nothing back from an external command
 	// no way of knowing if this has worked
 
