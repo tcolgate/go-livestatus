@@ -3,11 +3,11 @@ package livestatus
 import (
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 	"time"
 )
 
+/*
 var ()
 
 func init() {
@@ -68,24 +68,27 @@ func mustParseCommandDef(s string) *commandDef {
 	}
 	return &c
 }
+*/
 
 // Command is a binding command instance.
 type Command struct {
 	cmd  string
-	vals map[string]string
+	vals []string
 	ls   *Livestatus
 }
 
-func newCommand(s string, ls *Livestatus) *Command {
+func newCommand(ls *Livestatus) *Command {
 	return &Command{
-		cmd:  s,
-		vals: map[string]string{},
-		ls:   ls,
+		ls: ls,
 	}
 }
 
-func (c *Command) setVal(k string, v interface{}) {
-	c.vals[k] = fmt.Sprintf("%v", v)
+func (c *Command) Raw(cmd string) {
+	c.cmd = cmd
+}
+
+func (c *Command) Arg(v interface{}) {
+	c.vals = append(c.vals, fmt.Sprintf("%v", v))
 }
 
 type stickyBool bool
@@ -121,55 +124,55 @@ func (q *Query) KeepAliveOff() *Query {
 }
 
 func (c *Command) Hostname(s string) {
-	c.setVal("host_name", s)
+	c.Arg(s)
 }
 
 func (c *Command) ServiceDescription(s string) {
-	c.setVal("service_description", s)
+	c.Arg(s)
 }
 
 func (c *Command) Sticky(b bool) {
-	c.setVal("sticky", stickyBool(b).String())
+	c.Arg(stickyBool(b).String())
 }
 
 func (c *Command) Notify(b bool) {
-	c.setVal("notify", normalBool(b).String())
+	c.Arg(normalBool(b).String())
 }
 
 func (c *Command) Fixed(b bool) {
-	c.setVal("fixed", normalBool(b).String())
+	c.Arg(normalBool(b).String())
 }
 
 func (c *Command) Persistent(b bool) {
-	c.setVal("persistent", normalBool(b).String())
+	c.Arg(normalBool(b).String())
 }
 
 func (c *Command) Author(s string) {
-	c.setVal("author", s)
+	c.Arg(s)
 }
 
 func (c *Command) Comment(s string) {
-	c.setVal("comment", s)
+	c.Arg(s)
 }
 
 func (c *Command) Start(t time.Time) {
-	c.setVal("start_time", t.Unix())
+	c.Arg(t.Unix())
 }
 
 func (c *Command) End(t time.Time) {
-	c.setVal("end_time", t.Unix())
+	c.Arg(t.Unix())
 }
 
 func (c *Command) Duration(t time.Duration) {
-	c.setVal("duration", stringDuration{t}.String())
+	c.Arg(stringDuration{t}.String())
 }
 
 func (c *Command) TriggerID(i int) {
-	c.setVal("trigger_id", i)
+	c.Arg(i)
 }
 
 func (c *Command) DowntimeID(i int) {
-	c.setVal("downtime_id", i)
+	c.Arg(i)
 }
 
 // Exec executes the query.
@@ -210,33 +213,8 @@ func (c *Command) Exec() (*Response, error) {
 }
 
 func (c *Command) buildCmd(t time.Time) (string, error) {
-	//verify the command has all the args set, report what is missing
-	def, ok := commands[c.cmd]
-	if !ok {
-		// probably could fall back to dumps the vals out in the order provided
-		return "", fmt.Errorf("unknown command %s", c.cmd)
-	}
-
-	provided := map[string]bool{}
-	// Check the args are needed
-	for a := range c.vals {
-		if n, ok := def.needs[a]; !ok || !n {
-			return "", fmt.Errorf("command %s does not need argument %s", c.cmd, a)
-		}
-		provided[a] = true
-	}
-
-	// Check the needed args are provided
-	for n := range def.needs {
-		if p, ok := provided[n]; !ok || !p {
-			return "", fmt.Errorf("command %s requires argument %s", c.cmd, n)
-		}
-	}
-
 	cmdStr := fmt.Sprintf("COMMAND [%d] %s", t.Unix(), c.cmd)
-	for _, a := range def.args {
-		cmdStr = fmt.Sprintf("%s;%s", cmdStr, c.vals[a])
-	}
+	cmdStr = fmt.Sprintf("%s;%s", cmdStr, strings.Join(c.vals, ";"))
 
 	return fmt.Sprintf("%s\n", cmdStr), nil
 }

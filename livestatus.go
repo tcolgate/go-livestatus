@@ -30,9 +30,9 @@ func (l *Livestatus) Query(table string) *Query {
 }
 
 // Command creates a new command instanc.
-func (l *Livestatus) Command(cmd string) *Command {
+func (l *Livestatus) Command() *Command {
 	l.keepalive = true
-	return newCommand(cmd, l)
+	return newCommand(l)
 }
 
 // NewLivestatus creates a new binding instance.
