@@ -41,13 +41,36 @@ var argTypes = map[string]argDef{
 	"persistent":              {"bool", "Persistent(%s)"},
 	"author":                  {"string", `Author(%s)`},
 	"contact_name":            {"string", `ContactName(%s)`},
+	"contactgroup_name":       {"string", `ContactGroupName(%s)`},
+	"hostgroup_name":          {"string", `HostGroupName(%s)`},
+	"servicegroup_name":       {"string", `ServiceGroupName(%s)`},
 	"comment":                 {"string", `Comment(%s)`},
 	"start_time":              {"time.Time", `Start(%s)`},
 	"end_time":                {"time.Time", `End(%s)`},
+	"check_time":              {"time.Time", `CheckTime(%s)`},
+	"notification_time":       {"time.Time", `NotificationTime(%s)`},
 	"notification_timeperiod": {"string", `NotificationTimePeriod(%s)`},
 	"duration":                {"time.Duration", `Duration(%s)`},
 	"trigger_id":              {"int", `TriggerID(%s)`},
 	"downtime_id":             {"int", `DowntimeID(%s)`},
+	"comment_id":              {"int", `CommentID(%s)`},
+	"options":                 {"int", `Options(%s)`},
+	"value":                   {"string", `Value(%s)`},
+	"varname":                 {"string", `VarName(%s)`},
+	"varvalue":                {"string", `VarValue(%s)`},
+	"event_handler_command":   {"string", `EventHandlerCommand(%s)`},
+	"check_command":           {"string", `CheckCommand(%s)`},
+	"timeperiod":              {"string", `TimePeriod(%s)`},
+	"check_timeperod":         {"string", `CheckTimePeriod(%s)`},
+	"check_timeperiod":        {"string", `CheckTimePeriod(%s)`},
+	"check_attempts":          {"int", `CheckAttempts(%s)`},
+	"check_interval":          {"time.Duration", `Duration(%s)`},
+	"file_name":               {"string", `FileName(%s)`},
+	"delete":                  {"bool", `Delete(%s)`},
+	"status_code":             {"int", `StatusCode(%s)`},
+	"return_code":             {"int", `ReturnCode(%s)`},
+	"plugin_output":           {"string", `PluginOutput(%s)`},
+	"notification_number":     {"int", `NotificationNumber(%s)`},
 }
 
 func main() {
@@ -113,6 +136,7 @@ func findDefAndDesc(n *html.Node) (string, string) {
 		}
 		if n.Type == html.TextNode && foundDescHeader && desc == "" && strings.TrimSpace(n.Data) != "" {
 			desc = strings.TrimSpace(n.Data)
+			desc = strings.Replace(desc, "\n", " ", -1)
 			return
 		}
 
@@ -130,10 +154,16 @@ func findDefAndDesc(n *html.Node) (string, string) {
 
 func genCode(w io.Writer, pkg string, cmds []nagCmd) {
 	fmt.Fprintf(w, "package %v\n\n", pkg)
+	fmt.Fprintf(w, "import \"time\"\n\n")
 
+	done := map[string]bool{}
 	for _, c := range cmds {
 		err := c.parseCommandDef()
 		if err != nil {
+			continue
+		}
+		if _, ok := done[c.name]; ok {
+			//repeated command, CHANGE_HOST_CHECK_TIMEPERIOD is in there twice.
 			continue
 		}
 		nps := strings.Split(c.name, "_")
@@ -149,12 +179,13 @@ func genCode(w io.Writer, pkg string, cmds []nagCmd) {
 		for _, a := range c.args {
 			args = append(args, fmt.Sprintf("%s %s", a, argTypes[a].t))
 		}
-		fmt.Printf("func (c *Command) %v(%s){\n", goname, strings.Join(args, ", "))
+		fmt.Printf("func (c *Command) %v(%s) {\n", goname, strings.Join(args, ", "))
 		fmt.Printf("\tc.Raw(\"%v\")\n", c.name)
 		for _, a := range c.args {
 			fmt.Printf("\tc.%s\n", fmt.Sprintf(argTypes[a].fmtStr, a))
 		}
 		fmt.Printf("}\n\n")
+		done[c.name] = true
 	}
 }
 

@@ -127,6 +127,22 @@ func (c *Command) Hostname(s string) {
 	c.Arg(s)
 }
 
+func (c *Command) HostGroupName(s string) {
+	c.Arg(s)
+}
+
+func (c *Command) ServiceGroupName(s string) {
+	c.Arg(s)
+}
+
+func (c *Command) ContactName(s string) {
+	c.Arg(s)
+}
+
+func (c *Command) ContactGroupName(s string) {
+	c.Arg(s)
+}
+
 func (c *Command) ServiceDescription(s string) {
 	c.Arg(s)
 }
@@ -147,6 +163,10 @@ func (c *Command) Persistent(b bool) {
 	c.Arg(normalBool(b).String())
 }
 
+func (c *Command) Delete(b bool) {
+	c.Arg(normalBool(b).String())
+}
+
 func (c *Command) Author(s string) {
 	c.Arg(s)
 }
@@ -163,6 +183,18 @@ func (c *Command) End(t time.Time) {
 	c.Arg(t.Unix())
 }
 
+func (c *Command) CheckTime(t time.Time) {
+	c.Arg(t.Unix())
+}
+
+func (c *Command) NotificationTime(t time.Time) {
+	c.Arg(t.Unix())
+}
+
+func (c *Command) NotificationTimePeriod(s string) {
+	c.Arg(s)
+}
+
 func (c *Command) Duration(t time.Duration) {
 	c.Arg(stringDuration{t}.String())
 }
@@ -173,6 +205,58 @@ func (c *Command) TriggerID(i int) {
 
 func (c *Command) DowntimeID(i int) {
 	c.Arg(i)
+}
+
+func (c *Command) CommentID(i int) {
+	c.Arg(i)
+}
+
+func (c *Command) Options(i int) {
+	c.Arg(i)
+}
+
+func (c *Command) CheckAttempts(i int) {
+	c.Arg(i)
+}
+
+func (c *Command) StatusCode(i int) {
+	c.Arg(i)
+}
+
+func (c *Command) ReturnCode(i int) {
+	c.Arg(i)
+}
+
+func (c *Command) NotificationNumber(i int) {
+	c.Arg(i)
+}
+
+func (c *Command) Value(s string) {
+	c.Arg(s)
+}
+func (c *Command) VarName(s string) {
+	c.Arg(s)
+}
+func (c *Command) VarValue(s string) {
+	c.Arg(s)
+}
+func (c *Command) EventHandlerCommand(s string) {
+	c.Arg(s)
+}
+func (c *Command) CheckCommand(s string) {
+	c.Arg(s)
+}
+func (c *Command) TimePeriod(s string) {
+	c.Arg(s)
+}
+func (c *Command) CheckTimePeriod(s string) {
+	c.Arg(s)
+}
+func (c *Command) FileName(s string) {
+	c.Arg(s)
+}
+func (c *Command) PluginOutput(s string) {
+	c.Arg(s)
 }
 
 // Exec executes the query.
