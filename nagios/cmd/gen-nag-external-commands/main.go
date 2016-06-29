@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +14,8 @@ import (
 
 	"golang.org/x/net/html"
 )
+
+var out = flag.String("o", "", "output file to write to")
 
 var nagCmdIndex = "https://www.nagios.org/developerinfo/externalcommands/"
 var nagCmdURLRgxp = regexp.MustCompile(`<a href='(commandinfo.php\?command_id=[0-9]+)'>([A-Z_]+)</a></td></tr>`)
@@ -33,47 +36,62 @@ type argDef struct {
 }
 
 var argTypes = map[string]argDef{
-	"host_name":               {"string", `Hostname(%s)`},
-	"service_description":     {"string", `ServiceDescription(%s)`},
-	"sticky":                  {"bool", `Sticky(%s)`},
-	"notify":                  {"bool", `Notify(%s)`},
-	"fixed":                   {"bool", `Fixed(%s)`},
-	"persistent":              {"bool", "Persistent(%s)"},
-	"author":                  {"string", `Author(%s)`},
-	"contact_name":            {"string", `ContactName(%s)`},
-	"contactgroup_name":       {"string", `ContactGroupName(%s)`},
-	"hostgroup_name":          {"string", `HostGroupName(%s)`},
-	"servicegroup_name":       {"string", `ServiceGroupName(%s)`},
-	"comment":                 {"string", `Comment(%s)`},
-	"start_time":              {"time.Time", `Start(%s)`},
-	"end_time":                {"time.Time", `End(%s)`},
-	"check_time":              {"time.Time", `CheckTime(%s)`},
-	"notification_time":       {"time.Time", `NotificationTime(%s)`},
-	"notification_timeperiod": {"string", `NotificationTimePeriod(%s)`},
-	"duration":                {"time.Duration", `Duration(%s)`},
-	"trigger_id":              {"int", `TriggerID(%s)`},
-	"downtime_id":             {"int", `DowntimeID(%s)`},
-	"comment_id":              {"int", `CommentID(%s)`},
-	"options":                 {"int", `Options(%s)`},
-	"value":                   {"string", `Value(%s)`},
-	"varname":                 {"string", `VarName(%s)`},
-	"varvalue":                {"string", `VarValue(%s)`},
-	"event_handler_command":   {"string", `EventHandlerCommand(%s)`},
-	"check_command":           {"string", `CheckCommand(%s)`},
-	"timeperiod":              {"string", `TimePeriod(%s)`},
-	"check_timeperod":         {"string", `CheckTimePeriod(%s)`},
-	"check_timeperiod":        {"string", `CheckTimePeriod(%s)`},
-	"check_attempts":          {"int", `CheckAttempts(%s)`},
-	"check_interval":          {"time.Duration", `Duration(%s)`},
-	"file_name":               {"string", `FileName(%s)`},
-	"delete":                  {"bool", `Delete(%s)`},
-	"status_code":             {"int", `StatusCode(%s)`},
-	"return_code":             {"int", `ReturnCode(%s)`},
-	"plugin_output":           {"string", `PluginOutput(%s)`},
-	"notification_number":     {"int", `NotificationNumber(%s)`},
+	"host_name":               {"string", `Hostname(c, %s)`},
+	"service_description":     {"string", `ServiceDescription(c, %s)`},
+	"sticky":                  {"bool", `Sticky(c, %s)`},
+	"notify":                  {"bool", `Notify(c, %s)`},
+	"fixed":                   {"bool", `Fixed(c, %s)`},
+	"persistent":              {"bool", "Persistent(c, %s)"},
+	"author":                  {"string", `Author(c, %s)`},
+	"contact_name":            {"string", `ContactName(c, %s)`},
+	"contactgroup_name":       {"string", `ContactGroupName(c, %s)`},
+	"hostgroup_name":          {"string", `HostGroupName(c, %s)`},
+	"servicegroup_name":       {"string", `ServiceGroupName(c, %s)`},
+	"comment":                 {"string", `Comment(c, %s)`},
+	"start_time":              {"time.Time", `Start(c, %s)`},
+	"end_time":                {"time.Time", `End(c, %s)`},
+	"check_time":              {"time.Time", `CheckTime(c, %s)`},
+	"notification_time":       {"time.Time", `NotificationTime(c, %s)`},
+	"notification_timeperiod": {"string", `NotificationTimePeriod(c, %s)`},
+	"duration":                {"time.Duration", `Duration(c, %s)`},
+	"trigger_id":              {"int", `TriggerID(c, %s)`},
+	"downtime_id":             {"int", `DowntimeID(c, %s)`},
+	"comment_id":              {"int", `CommentID(c, %s)`},
+	"options":                 {"int", `Options(c, %s)`},
+	"value":                   {"string", `Value(c, %s)`},
+	"varname":                 {"string", `VarName(c, %s)`},
+	"varvalue":                {"string", `VarValue(c, %s)`},
+	"event_handler_command":   {"string", `EventHandlerCommand(c, %s)`},
+	"check_command":           {"string", `CheckCommand(c, %s)`},
+	"timeperiod":              {"string", `TimePeriod(c, %s)`},
+	"check_timeperod":         {"string", `CheckTimePeriod(c, %s)`},
+	"check_timeperiod":        {"string", `CheckTimePeriod(c, %s)`},
+	"check_attempts":          {"int", `CheckAttempts(c, %s)`},
+	"check_interval":          {"time.Duration", `Duration(c, %s)`},
+	"file_name":               {"string", `FileName(c, %s)`},
+	"delete":                  {"bool", `Delete(c, %s)`},
+	"status_code":             {"int", `StatusCode(c, %s)`},
+	"return_code":             {"int", `ReturnCode(c, %s)`},
+	"plugin_output":           {"string", `PluginOutput(c, %s)`},
+	"notification_number":     {"int", `NotificationNumber(c, %s)`},
 }
 
 func main() {
+	flag.Parse()
+
+	var err error
+	var file io.WriteCloser
+
+	file = os.Stdout
+	if *out != "" {
+		file, err = os.Create(*out)
+	}
+	if err != nil {
+		log.Fatalf("error creating file, %v", err.Error())
+	}
+
+	defer file.Close()
+
 	client := http.Client{}
 	buf := &bytes.Buffer{}
 	resp, err := client.Get(nagCmdIndex)
@@ -104,13 +122,9 @@ func main() {
 		}
 		def, desc := findDefAndDesc(doc)
 		nagCmds = append(nagCmds, nagCmd{def, desc, "", nil})
-
-		//if i > 2 {
-		//		break
-		//	}
 	}
 
-	genCode(os.Stdout, "livestatus", nagCmds)
+	genCode(file, "nagios", nagCmds)
 }
 
 func findDefAndDesc(n *html.Node) (string, string) {
@@ -155,6 +169,7 @@ func findDefAndDesc(n *html.Node) (string, string) {
 func genCode(w io.Writer, pkg string, cmds []nagCmd) {
 	fmt.Fprintf(w, "package %v\n\n", pkg)
 	fmt.Fprintf(w, "import \"time\"\n\n")
+	fmt.Fprintf(w, "import lvst \"github.com/tcolgate/go-livestatus\"\n\n")
 
 	done := map[string]bool{}
 	for _, c := range cmds {
@@ -171,20 +186,22 @@ func genCode(w io.Writer, pkg string, cmds []nagCmd) {
 		for _, np := range nps {
 			goname = goname + strings.ToUpper(np[0:1]) + strings.ToLower(np[1:])
 		}
-		fmt.Printf("// %v is generated from the nagios external command definition:\n", goname)
-		fmt.Printf("// Desfinition: %v\n", c.def)
-		fmt.Println("// Description:")
-		fmt.Printf("//  %v\n", c.desc)
+		fmt.Fprintf(w, "// %v is generated from the nagios external command definition:\n", goname)
+		fmt.Fprintf(w, "// Desfinition: %v\n", c.def)
+		fmt.Fprintln(w, "// Description:")
+		fmt.Fprintf(w, "//  %v\n", c.desc)
 		args := []string{}
 		for _, a := range c.args {
 			args = append(args, fmt.Sprintf("%s %s", a, argTypes[a].t))
 		}
-		fmt.Printf("func (c *Command) %v(%s) {\n", goname, strings.Join(args, ", "))
-		fmt.Printf("\tc.Raw(\"%v\")\n", c.name)
+		fmt.Fprintf(w, "func %v(%s) lvst.CommandOpFunc{\n", goname, strings.Join(args, ", "))
+		fmt.Fprint(w, "\treturn func (c *lvst.Command) {\n")
+		fmt.Fprintf(w, "\t\tc.Raw(\"%v\")\n", c.name)
 		for _, a := range c.args {
-			fmt.Printf("\tc.%s\n", fmt.Sprintf(argTypes[a].fmtStr, a))
+			fmt.Fprintf(w, "\t\t%s\n", fmt.Sprintf(argTypes[a].fmtStr, a))
 		}
-		fmt.Printf("}\n\n")
+		fmt.Fprint(w, "\t}\n")
+		fmt.Fprint(w, "}\n\n")
 		done[c.name] = true
 	}
 }
