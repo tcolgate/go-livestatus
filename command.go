@@ -5,7 +5,20 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	commandCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "livestatus_command_count",
+		Help: "",
+	}, []string{"command"})
+)
+
+func init() {
+	prometheus.MustRegister(commandCount)
+}
 
 // Command is a binding command instance.
 type Command struct {
@@ -49,6 +62,9 @@ func (c *Command) Exec() (*Response, error) {
 
 	if c.ls.keepConn != nil {
 		conn = c.ls.keepConn
+		connectReuseCount.
+			WithLabelValues(conn.RemoteAddr().String()).
+			Inc()
 	} else {
 		// Connect to socket
 		conn, err = c.dial()
@@ -74,6 +90,8 @@ func (c *Command) Exec() (*Response, error) {
 	// You get nothing back from an external command
 	// no way of knowing if this has worked
 
+	commandCount.WithLabelValues(c.cmd).Inc()
+
 	return resp, nil
 }
 
@@ -84,7 +102,19 @@ func (c *Command) buildCmd(t time.Time) (string, error) {
 	return fmt.Sprintf("%s\n", cmdStr), nil
 }
 
-func (c *Command) dial() (net.Conn, error) {
+func (c *Command) dial() (cc net.Conn, err error) {
+	defer func() {
+		if err != nil {
+			connectCount.
+				WithLabelValues(cc.RemoteAddr().String()).
+				Inc()
+			return
+		}
+		connectErrCount.
+			WithLabelValues(err.Error()).
+			Inc()
+	}()
+
 	if c.ls.dialer != nil {
 		return c.ls.dialer()
 	} else {

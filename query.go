@@ -9,7 +9,52 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	queryDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "livestatus_query_duration_seconds",
+		Help:    "Histogram of successful livestatus query durations, waiting indicates a WaitCondition in use",
+		Buckets: prometheus.LinearBuckets(0, 0.2, 10),
+	}, []string{"table", "waiting"})
+
+	responseSize = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "livestatus_response_size_bytes",
+		Help:    "Histogram of successful livestatus query response sizes",
+		Buckets: prometheus.LinearBuckets(0, 0.2, 10),
+	}, []string{"table"})
+
+	queryCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "livestatus_query_count",
+		Help: "",
+	}, []string{"table", "status", "error"})
+
+	connectCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "livestatus_connect_count",
+		Help: "Count of the successful connections",
+	}, []string{"addr"})
+
+	connectReuseCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "livestatus_connect_reuse_count",
+		Help: "Count of the number of times a connection is reused",
+	}, []string{"addr"})
+
+	connectErrCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "livestatus_connect_error_count",
+		Help: "Count of the failed connection attempts",
+	}, []string{"error"})
+)
+
+func init() {
+	prometheus.MustRegister(queryDuration)
+	prometheus.MustRegister(queryCount)
+	prometheus.MustRegister(responseSize)
+	prometheus.MustRegister(connectCount)
+	prometheus.MustRegister(connectReuseCount)
+	prometheus.MustRegister(connectErrCount)
+}
 
 // Query is a binding query instance.
 type Query struct {
@@ -17,6 +62,7 @@ type Query struct {
 	headers []string
 	columns []string
 	ls      *Livestatus
+	waiting bool
 }
 
 // Columns sets the names of the columns to retrieve when executing a query.
@@ -73,6 +119,7 @@ func (q *Query) WaitObject(obj string) *Query {
 
 // WaitCondition sets a new wait condition  to apply to the query.
 func (q *Query) WaitCondition(rule string) *Query {
+	q.waiting = true
 	q.headers = append(q.headers, "WaitCondition: "+rule)
 	return q
 }
@@ -112,13 +159,37 @@ func (q *Query) WaitTimeout(t time.Duration) *Query {
 
 // Exec executes the query.
 func (q *Query) Exec() (*Response, error) {
-	resp := &Response{}
-
 	var err error
 	var conn net.Conn
 
+	resp := &Response{}
+	st := time.Now()
+	size := 0
+
+	buf := bytes.NewBuffer(nil)
+
+	defer func() {
+		errstring := "success"
+		if err != nil {
+			errstring = err.Error()
+		}
+		queryCount.WithLabelValues(q.table, fmt.Sprintf("%d", resp.Status), errstring).Inc()
+
+		if err != nil {
+			queryDuration.
+				WithLabelValues(q.table, fmt.Sprintf("%t", q.waiting)).
+				Observe(float64(time.Now().Sub(st)) / float64(time.Second))
+			responseSize.
+				WithLabelValues(q.table).
+				Observe(float64(size))
+		}
+	}()
+
 	if q.ls.keepConn != nil {
 		conn = q.ls.keepConn
+		connectReuseCount.
+			WithLabelValues(conn.RemoteAddr().String()).
+			Inc()
 	} else {
 		// Connect to socket
 		conn, err = q.dial()
@@ -137,9 +208,7 @@ func (q *Query) Exec() (*Response, error) {
 	// Send command data
 	conn.Write([]byte(q.buildCmd()))
 
-	// Read response header
 	data := make([]byte, 16)
-
 	_, err = conn.Read(data)
 	if err != nil {
 		return nil, err
@@ -149,9 +218,6 @@ func (q *Query) Exec() (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Receive response data
-	buf := bytes.NewBuffer(nil)
 
 	for {
 		data = make([]byte, 1024)
@@ -175,6 +241,7 @@ func (q *Query) Exec() (*Response, error) {
 	if buf.Len() == 0 {
 		return resp, nil
 	}
+	size = buf.Len()
 
 	// Parse received data for records
 	resp.Records, err = q.parse(buf.Bytes())
@@ -201,7 +268,19 @@ func (q *Query) buildCmd() string {
 	return cmd
 }
 
-func (q *Query) dial() (net.Conn, error) {
+func (q *Query) dial() (c net.Conn, err error) {
+	defer func() {
+		if err != nil {
+			connectCount.
+				WithLabelValues(c.RemoteAddr().String()).
+				Inc()
+			return
+		}
+		connectErrCount.
+			WithLabelValues(err.Error()).
+			Inc()
+	}()
+
 	if q.ls.dialer != nil {
 		return q.ls.dialer()
 	} else {
