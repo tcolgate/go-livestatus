@@ -28,7 +28,7 @@ var (
 
 	queryCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "livestatus_query_count",
-		Help: "",
+		Help: "Count of the livestatus queries sent",
 	}, []string{"table", "status", "error"})
 
 	connectCount = prometheus.NewCounterVec(prometheus.CounterOpts{
