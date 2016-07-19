@@ -175,7 +175,7 @@ func (q *Query) Exec() (*Response, error) {
 		}
 		queryCount.WithLabelValues(q.table, fmt.Sprintf("%d", resp.Status), errstring).Inc()
 
-		if err != nil {
+		if err == nil {
 			queryDuration.
 				WithLabelValues(q.table, fmt.Sprintf("%t", q.waiting)).
 				Observe(float64(time.Now().Sub(st)) / float64(time.Second))
