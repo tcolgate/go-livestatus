@@ -3,6 +3,7 @@ package livestatus
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -296,7 +297,12 @@ func (q *Query) parse(data []byte) ([]Record, error) {
 
 	// Unmarshal received data
 	if err := json.Unmarshal(data, &rows); err != nil {
-		return nil, err
+		str := string(data)
+		sz := len(data)
+		if sz > 128 {
+			str = string(data[:127]) + "..."
+		}
+		return nil, errors.New(str)
 	} else if len(q.columns) == 0 && len(rows) < 2 || len(q.columns) > 0 && len(rows) < 1 {
 		return records, nil
 	}
