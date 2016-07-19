@@ -300,7 +300,7 @@ func (q *Query) parse(data []byte) ([]Record, error) {
 		str := string(data)
 		sz := len(data)
 		if sz > 128 {
-			str = string(data[:127]) + "..."
+			str = string(data[0:127]) + "..."
 		}
 		return nil, errors.New(str)
 	} else if len(q.columns) == 0 && len(rows) < 2 || len(q.columns) > 0 && len(rows) < 1 {
