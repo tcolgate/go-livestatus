@@ -12,7 +12,7 @@ import (
 var (
 	commandCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "livestatus_command_count",
-		Help: "",
+		Help: "A counter of the livestatus commands sent to the server",
 	}, []string{"command"})
 )
 
