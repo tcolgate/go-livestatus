@@ -104,7 +104,7 @@ func (c *Command) buildCmd(t time.Time) (string, error) {
 
 func (c *Command) dial() (cc net.Conn, err error) {
 	defer func() {
-		if err != nil {
+		if err == nil {
 			connectCount.
 				WithLabelValues(cc.RemoteAddr().String()).
 				Inc()

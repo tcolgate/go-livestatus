@@ -270,7 +270,7 @@ func (q *Query) buildCmd() string {
 
 func (q *Query) dial() (c net.Conn, err error) {
 	defer func() {
-		if err != nil {
+		if err == nil {
 			connectCount.
 				WithLabelValues(c.RemoteAddr().String()).
 				Inc()
