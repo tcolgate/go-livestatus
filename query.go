@@ -23,7 +23,7 @@ var (
 	responseSize = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "livestatus_response_size_bytes",
 		Help:    "Histogram of successful livestatus query response sizes",
-		Buckets: prometheus.LinearBuckets(0, 0.2, 10),
+		Buckets: prometheus.ExponentialBuckets(32, 2, 8),
 	}, []string{"table"})
 
 	queryCount = prometheus.NewCounterVec(prometheus.CounterOpts{
